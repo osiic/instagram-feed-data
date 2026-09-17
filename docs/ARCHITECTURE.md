@@ -1,100 +1,53 @@
-# Architecture
+# System Architecture & Data Flow
 
-## High-level
+## 1. High-Level Architecture
 
-Browser
-  -> Next.js UI
-  -> Next.js server routes/server actions
-  -> Application services
-  -> PostgreSQL/Prisma
-  -> Meta/Instagram API
+```
+[Browser / User]
+       │
+       ▼
+[Next.js App Router (app/page.tsx)]
+       │
+       ├─ (1) Initial Page View ──────────────► [Local Database / Prisma]
+       │                                        • Instantaneous read (< 10ms)
+       │                                        • Zero calls to Instagram
+       │
+       └─ (2) Explicit Actions ("Add" / "Sync" / "Sync All")
+              │
+              ▼
+       [API Routes (/api/instagram/accounts/*)]
+              │
+              ▼
+       [Scraper Service (lib/instagram/scraper.ts)]
+              │
+              ├─ HTTP GET with Desktop Browser Headers
+              ▼
+       [Instagram Web (https://www.instagram.com/{username}/)]
+              │
+              ▼
+       [Extract SSR JSON & OpenGraph Meta]
+              │
+              ▼
+       [Save / Upsert Profile & Media to Database]
+              │
+              ▼
+       [Redirect & Revalidate Home Page (/)]
+```
 
-Meta OAuth:
-Browser -> `/api/instagram/connect`
-        -> Meta authorization
-        -> `/api/instagram/callback`
-        -> validate OAuth state
-        -> exchange/obtain token server-side
-        -> fetch/validate account
-        -> persist account + token
-        -> redirect to dashboard
+## 2. Scraping Mechanism
 
-## Layers
+Instagram serves server-side rendered (SSR) JSON data to modern desktop browser User-Agents.
+- Target URL: `https://www.instagram.com/{username}/`
+- User-Agent: `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36`
+- Profile data extracted from:
+  - `"xig_user_by_username":{...}` or `"xig_user_by_igid_v2":{...}`
+  - Fallback: `<meta property="og:description">`, `<meta property="og:image">`, `<meta property="og:title">`
+- Recent posts extracted from:
+  - `"polaris_ordered_timeline_connection":{"edges": [...]}`
+  - Extracts 12 recent timeline posts containing shortcode, display URI, media type, and captions.
 
-### UI
-`app/` and `components/`
-- Render dashboard.
-- Never contain Meta secrets.
-- Never call Meta API directly.
+## 3. Database Caching Layer
 
-### Application services
-`lib/instagram/`
-- OAuth.
-- Account retrieval.
-- Media retrieval.
-- Insights retrieval.
-- Token lifecycle.
-- API response normalization.
-
-### Database
-`lib/db/` + Prisma.
-- Persist SaaS users.
-- Persist connected Instagram accounts.
-- Persist encrypted/safely stored token material.
-- Persist optional synchronized media/insight snapshots.
-
-### Security
-`lib/security/`
-- Authentication helpers.
-- OAuth state validation.
-- Token encryption/decryption if implemented.
-- Ownership checks.
-
-## Suggested structure
-
-app/
-  (auth)/
-  dashboard/
-  dashboard/accounts/
-  dashboard/accounts/[id]/
-  dashboard/accounts/[id]/media/
-  dashboard/accounts/[id]/insights/
-  api/
-    instagram/
-      connect/
-      callback/
-      accounts/
-      accounts/[id]/
-      accounts/[id]/media/
-      accounts/[id]/insights/
-
-components/
-  ui/
-  dashboard/
-  instagram/
-
-lib/
-  auth/
-  db/
-  instagram/
-    client.ts
-    oauth.ts
-    account.ts
-    media.ts
-    insights.ts
-  security/
-  validations/
-
-prisma/
-  schema.prisma
-
-## Data flow
-UI -> authenticated server operation -> ownership check -> service -> DB/API -> normalized response -> UI.
-
-Do not scatter raw Meta fetch calls across React components.
-
-## Multi-account isolation
-Every InstagramAccount query must be scoped through the authenticated SaaS user. Never trust an account ID alone.
-
-## Caching/sync
-For MVP, use a simple database-backed approach. Avoid complex queues unless required. Design service boundaries so background sync can be added later.
+- All initial requests read from the local store (`prisma.instagramAccount` and `prisma.instagramMedia`).
+- Because requests do not trigger outbound HTTP calls to Instagram, page loads are not subject to rate limits or IP blocks.
+- When an account is removed, related media records are cascaded and deleted immediately.

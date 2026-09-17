@@ -1,49 +1,27 @@
-# AI Vibe Coding Rules
+# AI Coding Rules for This Repository
 
-Read this file before modifying the codebase.
+Read this file before proposing or writing code in this repository.
 
-## Rule 1 — Read context first
-Read:
-- PRD.md
-- MVP_SCOPE.md
-- ARCHITECTURE.md
-- DATABASE.md
-- API.md
-- SECURITY.md
+---
 
-Then inspect the existing repository.
+## Rule 1 — Architecture Alignment
+1. **Never Reintroduce Meta OAuth**: Do not add Meta App OAuth, Facebook login dialogs, Graph API tokens, or Better Auth back into this codebase. Public scraping via `lib/instagram/scraper.ts` is the architectural standard.
+2. **Database Caching First**: Never perform outbound scraping on normal page loads (`/`). Page views must read cached records from `prisma` / `memoryStore`. Scraping must remain confined to explicit sync actions.
 
-## Rule 2 — Do not rewrite working code unnecessarily
-Prefer small, targeted changes.
+## Rule 2 — UI & React Best Practices
+1. **English Interface**: All user-facing text, error messages, badges, and labels must be written in English.
+2. **React Key Uniqueness**: Always use compound keys for rendered media lists:
+   ```tsx
+   key={`${account.id}_${post.instagramMediaId || post.id}`}
+   ```
+3. **No Unrequested Abstractions**: Keep code minimal, clean, and dependency-free. Do not add heavy npm libraries for scraping.
 
-## Rule 3 — Preserve architecture
-Do not move provider logic into React components.
-Do not bypass ownership checks.
-Do not introduce a second ORM or second database layer.
+## Rule 3 — Port Constraints
+- The Next.js dev server runs on **port 3000**.
+- **Do not kill, touch, or bind to port 20128** (reserved by host system `9router`).
 
-## Rule 4 — Verify provider capabilities
-If an Instagram/Meta feature is not available for the selected API/account type, do not fake it. Mark it unavailable and explain the limitation.
-
-## Rule 5 — Mock mode
-Keep `MOCK_INSTAGRAM=true` useful for local development. Mock mode must be explicit and disabled in production.
-
-## Rule 6 — After each phase
-Run:
-- typecheck
-- lint
-- tests where present
-- build when practical
-
-Fix errors before moving on.
-
-## Rule 7 — Explain meaningful decisions
-When a requirement is ambiguous, choose the smallest reasonable implementation and document the assumption.
-
-## Rule 8 — No scope creep
-Do not build scheduling, publishing, teams, billing, inbox, or advanced analytics unless explicitly requested.
-
-## Rule 9 — UI quality
-Mobile-first, accessible, consistent, simple SaaS visual hierarchy.
-
-## Rule 10 — Security is non-negotiable
-Never expose secrets or tokens. Always enforce authenticated ownership.
+## Rule 4 — Quality Gate
+Before reporting a task complete, verify that:
+1. `bunx tsc --noEmit` passes with 0 errors.
+2. `bun lint` passes with 0 errors.
+3. `bun test` passes with 0 failures.

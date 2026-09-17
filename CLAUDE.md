@@ -2,71 +2,67 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Overview
+
+Instagram Multi-Account Public Profile & Feed Scraper application.
+Users can track any public Instagram account by entering their `@username` (e.g. `cristiano`, `jokowi`, `baron_nduts`).
+The app uses a **Database-First Caching** approach:
+- Loading the dashboard/home page reads **100% directly from the database** (instant response, zero Instagram requests, zero rate limiting).
+- Scraping only occurs when the user submits a new username or clicks **"Sync"** / **"Sync All"**.
+- No Meta OAuth, no Facebook login, no API keys, and no Better Auth are required.
+
 ## Commands
 
 ```bash
-# Dev server
-bun dev
+# Start dev server (always use port 3000)
+bun dev -- --port 3000
 
-# Build
-bun build
+# Build production bundle
+bunx next build
 
-# Lint
+# Lint check
 bun lint
 
 # Type-check (no emit)
 bunx tsc --noEmit
 
-# Run all tests
+# Run unit tests
 bun test
-
-# Run a single test file
-bun test tests/e2e-flow.test.ts
-
-# Database migrations
-bunx prisma migrate dev
-bunx prisma generate
-
-# Mock mode — UI/DB flows without live Meta credentials
-MOCK_INSTAGRAM=true bun dev
 ```
 
-Run after changes: `bunx tsc --noEmit` -> `bun lint` -> `bun test`.
+Always verify changes with: `bunx tsc --noEmit` -> `bun lint` -> `bun test`.
+
+## Environment & Port Constraints
+
+- **Port 3000**: Dedicated to this Next.js project.
+- **Port 20128**: Strictly reserved for the host system's `9router`. **NEVER kill, touch, or bind to port 20128.**
+- **PostgreSQL**: Port 5432. An in-memory store fallback (`lib/db/memory-store.ts`) is automatically available if PostgreSQL is inactive during local testing.
 
 ## Architecture & Data Flow
 
-Next.js 16 App Router, React 19, TypeScript strict, Tailwind CSS v4, PostgreSQL + Prisma, Better Auth, Zod validation. Runtime: **bun**.
-
 ```
-Browser / UI (app/ + components/)
-  -> Server Route / Server Action (app/api/...)
-  -> Session validation (lib/auth/session.ts)
-  -> Multi-tenant ownership check (lib/security/ownership.ts)
-  -> Instagram Service (lib/instagram/)
-  -> Meta Graph API (or lib/instagram/mock.ts if MOCK_INSTAGRAM=true)
-  -> Prisma Client (lib/db/client.ts)
-  -> Normalized response (types/api.ts) -> UI
+Browser / Client (app/page.tsx)
+  -> Home Page: Reads cached accounts & media directly from Prisma / memoryStore (Fast DB Read)
+  -> Add / Sync Account: POST /api/instagram/accounts { username }
+  -> Sync All Accounts: POST /api/instagram/accounts/sync-all
+  -> Scraper Service: lib/instagram/scraper.ts (Native server-side fetch with desktop browser headers)
+  -> Database Upsert: Prisma instagramAccount & instagramMedia
+  -> Delete Account: POST /api/instagram/accounts/[id]
 ```
 
-### Module Responsibilities
+## Key Files & Modules
 
-- **`app/`**: Next.js App Router pages and API routes. Route groups: `(auth)` for login/register, `dashboard` for main UI.
-- **`components/`**: UI components split into `dashboard/` (layout, header, account switcher) and `instagram/` (media grid, insights cards, modal).
-- **`lib/auth/`**: Better Auth setup (`server.ts`), client helpers (`client.ts`), and session validation (`session.ts`).
-- **`lib/instagram/`**: Meta Graph API integration. `client.ts` (API calls), `oauth.ts` (token exchange & storage), `account.ts`, `media.ts`, `insights.ts`, and `mock.ts` (mock responses).
-- **`lib/security/`**:
-  - `encryption.ts`: AES-256-GCM token encryption/decryption via Node crypto (`TOKEN_ENCRYPTION_KEY`).
-  - `ownership.ts`: Verifies `InstagramAccount.userId === session.userId`.
-  - `oauth-state.ts`: Generates and validates signed OAuth state parameters.
-  - `error-handler.ts`: Sanitizes errors to prevent credential leaks.
-- **`lib/db/`**: Prisma singleton (`client.ts`).
-- **`lib/validations/`**: Zod schemas for env vars, route params, and OAuth callbacks.
-- **`prisma/schema.prisma`**: Better Auth tables (`User`, `Session`, `Account`, `Verification`) and domain models (`InstagramAccount`, `InstagramToken`, `InstagramMedia`, `InstagramInsight`).
+- **`app/page.tsx`**: Unified single-page UI (English) featuring the Add Account form, Sync All action, multi-account profile summary cards, stats, and recent 12-post grid feeds.
+- **`lib/instagram/scraper.ts`**: Pure TypeScript scraper without external npm dependencies. Extracts user profiles (`xig_user_by_username` / OpenGraph meta) and recent timeline posts (`polaris_ordered_timeline_connection`).
+- **`app/api/instagram/accounts/route.ts`**: Handles adding new accounts and syncing existing ones.
+- **`app/api/instagram/accounts/sync-all/route.ts`**: Triggers batch re-syncing of all connected accounts.
+- **`app/api/instagram/accounts/[id]/route.ts`**: Handles account deletion and cascades related media removal.
+- **`lib/db/client.ts` & `lib/db/memory-store.ts`**: Prisma client wrapper with transparent in-memory fallback for local development.
+- **`feature-get-instagram-data/`**: Standalone documentation and ready-to-copy package for porting this feature into a 3-slot dedicated dashboard (`@baron_nduts`, `@baron_nduts_bbq`, `@baron_nduts.cottage`).
 
 ## Strict Implementation Rules
 
-1. **Multi-Account / Multi-Tenant Isolation**: Every `InstagramAccount` DB query must include `userId: session.userId`. Never query by `id` alone.
-2. **Token Security**: Tokens are stored encrypted (AES-256-GCM) in `InstagramToken.encryptedAccessToken`. Never return decrypted tokens to the client or in API responses.
-3. **API Errors**: Return standardized `{ error: { code: string, message: string } }` shapes. Never leak provider error bodies, stack traces, or secrets.
-4. **Mock Mode**: `MOCK_INSTAGRAM=true` allows full flow testing without Meta API credentials. Ensure mock paths stay behind the same service interfaces.
-5. **Meta Graph API**: Official OAuth and Graph API only. No scraping or unofficial endpoints.
+1. **Do Not Reintroduce Meta OAuth**: Meta Graph API/OAuth is permanently deprecated in this repository due to Meta Developer Portal review restrictions.
+2. **Database Caching First**: Never trigger live scraping on regular page loads (`app/page.tsx`). Always read from database/store and only scrape on explicit sync actions.
+3. **Unique React Keys**: Ensure post items in grids use compound unique keys (`${account.id}_${post.instagramMediaId || post.id}`) to prevent React reconciliation warnings.
+4. **Desktop User-Agent**: When fetching Instagram HTML, always send standard modern Chrome Desktop headers to receive the SSR JSON payload containing timeline posts.

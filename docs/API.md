@@ -1,135 +1,71 @@
 # API Contract
 
-All application API endpoints are server-side.
+All endpoints are Next.js server-side Route Handlers located under `app/api/instagram/`.
 
-## Authentication
-Use the application's auth mechanism for all protected routes.
+---
 
-## Instagram OAuth
+## 1. List Accounts
 
-### GET `/api/instagram/connect`
-Starts Meta OAuth.
+### `GET /api/instagram/accounts`
+Returns all monitored Instagram accounts stored in the database.
 
-Responsibilities:
-- require authenticated SaaS user
-- generate cryptographically secure OAuth state
-- persist/associate state safely
-- redirect to official Meta authorization URL
-
-### GET `/api/instagram/callback`
-Handles OAuth callback.
-
-Responsibilities:
-- validate state
-- handle OAuth errors/cancellation
-- exchange authorization result server-side
-- retrieve/validate supported Instagram account
-- securely store token
-- create/update InstagramAccount
-- redirect to account dashboard
-
-Never expose the access token in the redirect URL.
-
-## Accounts
-
-### GET `/api/instagram/accounts`
-Returns connected accounts for current user.
-
-Response shape:
+**Response `200 OK`:**
 ```json
 {
   "accounts": [
     {
-      "id": "internal-id",
-      "username": "@example",
-      "name": "Example",
-      "profilePictureUrl": null,
-      "followersCount": 0,
-      "mediaCount": 0,
-      "accountType": "PROFESSIONAL"
+      "id": "acc_1789678177683_0bb18",
+      "username": "cristiano",
+      "name": "Cristiano Ronaldo",
+      "profilePictureUrl": "https://...",
+      "followersCount": 679695907,
+      "followsCount": 635,
+      "mediaCount": 4131,
+      "accountType": "VERIFIED",
+      "lastSyncedAt": "2026-09-17T20:50:42.500Z"
     }
   ]
 }
 ```
 
-### GET `/api/instagram/accounts/:id`
-Returns one account after ownership validation.
+---
 
-### DELETE `/api/instagram/accounts/:id`
-Disconnects account after ownership validation.
+## 2. Add or Sync an Account
 
-It must revoke/delete local token data as appropriate and remove the connected account from the SaaS database.
+### `POST /api/instagram/accounts`
+Accepts a username, scrapes the public profile and recent posts from Instagram, and saves the data to the database.
 
-## Media
-
-### GET `/api/instagram/accounts/:id/media`
-Returns normalized media for the owned account.
-
-Potential response:
+**Request Body** (`application/json` or `application/x-www-form-urlencoded`):
 ```json
 {
-  "media": [
-    {
-      "id": "internal-id",
-      "mediaType": "IMAGE",
-      "mediaUrl": "...",
-      "thumbnailUrl": null,
-      "caption": "...",
-      "permalink": "...",
-      "timestamp": "...",
-      "likeCount": 0,
-      "commentsCount": 0
-    }
-  ]
+  "username": "cristiano"
 }
 ```
 
-Only include fields actually available.
+**Responses:**
+- `307 Redirect` to `/?success=added&username={username}` on success.
+- `307 Redirect` to `/?error=user_not_found&username={username}` if user does not exist.
+- `307 Redirect` to `/?error=account_private&username={username}` if user account is private.
+- `307 Redirect` to `/?error=profile_fetch_failed` if rate-limited by Instagram.
 
-## Insights
+---
 
-### GET `/api/instagram/accounts/:id/insights`
-Returns normalized available metrics.
+## 3. Sync All Accounts
 
-Potential response:
-```json
-{
-  "insights": [
-    {
-      "metric": "reach",
-      "value": 0,
-      "period": "day",
-      "startAt": "...",
-      "endAt": "..."
-    }
-  ]
-}
-```
+### `POST /api/instagram/accounts/sync-all`
+Iterates through all monitored accounts in the database and re-scrapes their latest profiles and feed posts.
 
-Do not fabricate unsupported metrics.
+**Response:**
+- `307 Redirect` to `/?success=synced_all&count={number}` on success.
 
-## Error format
+---
 
-Use a consistent safe shape:
+## 4. Delete an Account
 
-```json
-{
-  "error": {
-    "code": "INSTAGRAM_API_UNAVAILABLE",
-    "message": "Instagram data is temporarily unavailable."
-  }
-}
-```
+### `POST /api/instagram/accounts/{id}` or `DELETE /api/instagram/accounts/{id}`
+Deletes the account and cascades deletion of all associated media posts from the database.
 
-Do not return raw provider errors, secrets, access tokens, or internal stack traces.
-
-## Service API
-
-Prefer internal functions such as:
-- `getInstagramAccount(accountId, userId)`
-- `getInstagramMedia(accountId, userId)`
-- `getInstagramInsights(accountId, userId)`
-- `disconnectInstagramAccount(accountId, userId)`
-- `refreshInstagramToken(accountId)`
-
-The service layer owns provider-specific implementation details.
+**Response:**
+- `307 Redirect` to `/` on success (from HTML form).
+- `200 OK` `{ "success": true }` (from fetch/XHR).
+- `404 Not Found` `{ "error": { "code": "ACCOUNT_NOT_FOUND" } }` if account ID does not exist.

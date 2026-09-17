@@ -1,83 +1,15 @@
-# Security Requirements
+# Security & Rate Limiting Considerations
 
-## Secrets
-- Never commit `.env`.
-- Never hardcode Meta app secrets.
-- Never send `META_APP_SECRET` to the browser.
-- Never log access tokens.
+## 1. Credentials & Secrets
+- No Meta App Secret, App ID, or OAuth tokens are used or required by this project.
+- Never commit `.env` files containing production database connection strings.
 
-## OAuth
-- Use official Meta OAuth.
-- Use cryptographically secure state.
-- Validate state on callback.
-- Handle callback errors.
-- Do not trust client-provided account ownership.
-- Keep token exchange server-side.
+## 2. Instagram Rate Limiting & Anti-Abuse
+- **Server-Side Only**: Scraping is performed entirely server-side. Client browsers never make direct CORS-violating requests to Instagram.
+- **Cache-First Protection**: Loading the home page (`app/page.tsx`) queries the local database and never touches Instagram. This completely shields the server IP from being rate-limited during regular page traffic.
+- **User-Agent Management**: Inbound requests to Instagram use modern Chrome desktop headers to avoid being blocked with login redirects.
+- **CDN Hotlinking & Expiry**: Instagram CDN image URLs (`scontent.cdninstagram.com`) contain signed expiry tokens (`oe=...`) valid for 2-4 weeks. Triggering a manual "Sync" refreshes these image URLs in the database.
 
-## Token storage
-Access tokens are credentials.
-
-Preferred MVP approach:
-- encrypt tokens at rest using a server-only encryption key, or use an established secure credential-storage mechanism.
-- keep encryption/decryption isolated in `lib/security/`.
-- never return decrypted tokens through API responses.
-- never store them in localStorage/sessionStorage.
-
-If implementing application-level encryption, use authenticated encryption (for example AES-GCM) with a strong random key stored only in environment/secret management. Do not invent cryptography.
-
-Add an environment variable such as:
-`TOKEN_ENCRYPTION_KEY=`
-
-Document key rotation before production.
-
-## Authorization
-Every connected account operation must verify authenticated user ownership.
-
-Bad:
-`findUnique({ where: { id: accountId } })`
-
-Safe conceptual pattern:
-find account by ID AND authenticated user ID.
-
-## Client/server boundaries
-Meta API calls and token handling belong on the server.
-
-Client components receive only safe normalized data.
-
-## Input validation
-Validate:
-- route parameters
-- query parameters
-- OAuth callback parameters
-- API payloads
-
-Use Zod or equivalent.
-
-## Provider data
-Treat all external API data as untrusted input.
-
-Normalize and validate before rendering.
-
-## Logging
-Safe to log:
-- request correlation ID
-- internal account ID
-- operation name
-- non-sensitive provider error category
-
-Never log:
-- access tokens
-- client secrets
-- authorization codes
-- cookies/session secrets
-
-## Production checklist
-- HTTPS
-- secure cookies
-- secure secret management
-- production OAuth redirect URI
-- least-privilege Meta permissions
-- database backups
-- rate limiting where appropriate
-- audit logging for sensitive account actions
-- error monitoring without credential capture
+## 3. Input Sanitization
+- All usernames are trimmed, lowercase-normalized, and stripped of leading `@` symbols before being used in URL formation or database queries.
+- SQL injection is prevented by utilizing Prisma ORM parameterized queries.

@@ -1,80 +1,22 @@
-# PRD — Instagram Multi-Account Manager
+# PRD — Instagram Multi-Account Public Profile & Feed Scraper
 
-## 1. Product
-A mobile-first SaaS dashboard that lets one application user connect multiple Instagram Professional/Business accounts and manage/view their available profile, media, and insights data.
+## 1. Product Summary
+A single-page, multi-account Instagram viewer and scraper that lets users monitor public Instagram profiles and recent feeds simply by providing Instagram handles (`@username`).
 
-## 2. Problem
-Business owners and operators may manage several brands/accounts. Switching between Instagram accounts and understanding their current content and metrics is cumbersome.
+## 2. Problem Statement
+Official Meta Graph API access requires Facebook app reviews, business verification, and permissions that are difficult or impossible for small teams and personal projects to obtain. Frequent `Feature Unavailable` errors and strict OAuth gating make building simple public brand monitors via the official API unreliable.
 
-## 3. MVP user
-A business owner, operator, or small team member managing several Instagram Professional/Business accounts.
+## 3. Solution
+- Direct server-side scraping of public Instagram profile pages using standard browser headers.
+- Extracting public profile statistics (Followers, Following, Posts count, Bio, Avatar) and 12 recent timeline posts.
+- Saving scraped data into a persistent local database (PostgreSQL / Prisma).
+- Serving page requests purely from the local database cache to eliminate loading delay and prevent Instagram rate limits.
+- Providing manual "Sync" and "Sync All" triggers to fetch fresh data on demand.
 
-## 4. Core user journey
-1. Sign in to the SaaS.
-2. Open Instagram Manager.
-3. Connect an Instagram account using Meta OAuth.
-4. Return to the dashboard.
-5. See connected accounts.
-6. Switch between accounts.
-7. View profile summary, recent media, and available insights.
-8. Disconnect an account when needed.
+## 4. Core User Journeys
 
-## 5. MVP value
-The product provides one clean place to see multiple connected Instagram accounts without storing Instagram passwords or scraping Instagram.
-
-## 6. Functional requirements
-
-### Authentication
-- Application authentication is separate from Instagram OAuth.
-- Only authenticated SaaS users can access connected-account data.
-
-### Instagram connection
-- Use official Meta OAuth.
-- Never request or store Instagram passwords.
-- Store only required account/token data.
-- Handle cancellation, failure, revoked access, expired tokens, and missing permissions.
-
-### Account management
-- List connected accounts.
-- Select an account.
-- View account profile information.
-- Disconnect an account.
-- Prevent cross-user data access.
-
-### Media
-Show available:
-- image/media URL
-- media type
-- caption when available
-- timestamp
-- permalink when available
-- engagement metrics when available
-
-### Insights
-Show only metrics supported by the chosen official API and account type.
-If unavailable, show a clear unavailable state.
-
-## 7. Non-functional requirements
-- Mobile-first.
-- Responsive desktop layout.
-- Accessible.
-- Fast perceived performance.
-- Server-side secrets.
-- TypeScript strict.
-- Graceful loading, empty, and error states.
-
-## 8. Success criteria
-A user can authenticate, connect multiple supported Instagram accounts, switch accounts, view available profile/media/insight data, and disconnect accounts without exposing credentials or tokens.
-
-## 9. Explicit non-goals
-- Instagram password login.
-- Instagram scraping.
-- Unofficial APIs.
-- Full social media scheduler.
-- Auto-posting unless later verified and explicitly scoped.
-- Team/workspace permissions.
-- Billing/subscriptions.
-- Advanced analytics.
-- Social inbox.
-- Comment management.
-- Elaborate background job infrastructure.
+1. **Add Account**: User enters an Instagram handle in the input box and clicks "Add Account". Server scrapes the public profile and recent posts, saves them to the database, and renders the account card and media grid.
+2. **View Multi-Account Feed**: User views multiple brand accounts on a single page, seeing followers, following, bio, and recent posts for each account.
+3. **Sync Account**: User clicks the "Sync" icon on any account card to refresh its statistics and feed from Instagram.
+4. **Sync All**: User clicks "Sync All" at the top of the page to refresh all monitored accounts in a single batch.
+5. **Remove Account**: User clicks the "Remove" icon to delete an account and its cached media from the system.

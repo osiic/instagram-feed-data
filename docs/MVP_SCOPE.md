@@ -1,50 +1,23 @@
-# MVP Scope
+# MVP Scope — Instagram Multi-Account Public Scraper
 
-## Must have
-- SaaS authentication
-- Meta OAuth connection flow
-- Multiple connected Instagram accounts per SaaS user
-- Account switcher
-- Profile summary
-- Recent media
-- Basic available insights
-- Disconnect account
-- Secure token handling
-- Mock development mode
-- Mobile-first dashboard
-- Loading/empty/error states
+## In-Scope (Implemented)
 
-## Should have
-- Refresh/sync action
-- Last synced timestamp
-- Connection status
-- Basic date range selector for insights if supported cleanly
+- **Add Public Account**: Simple input form accepting any public `@username`.
+- **Multi-Account Monitoring**: Support for tracking multiple accounts on a single dashboard.
+- **Profile Summary**: Displays avatar, name, handle, bio, verified badge, followers, following, and post counts.
+- **Recent Feed Grid**: 12 most recent timeline posts with image preview, video/carousel badges, and direct links.
+- **Database Caching**: Initial page loads read from the local database without hitting Instagram.
+- **Manual Sync Actions**:
+  - Individual account sync to update statistics and feed.
+  - Global "Sync All" button to refresh all monitored accounts in one action.
+- **Account Removal**: Single-click account deletion that cleans up cached media.
+- **Responsive Layout**: Mobile-first design styled with Tailwind CSS v4.
+- **Dedicated Porting Package**: Standalone 3-slot implementation documented in `./feature-get-instagram-data/`.
 
-## Could have later
-- Content publishing
-- Scheduling
-- Content calendar
-- Comment/inbox management
-- Team members
-- Workspaces
-- Role-based access
-- Client/agency mode
-- Reporting/export
-- AI content assistant
-- Billing
-- Notifications
-- Background synchronization
+## Out-of-Scope (Deferred / Intentional Exclusions)
 
-## Must not build in MVP
-- Password-based Instagram login
-- Scraping
-- Unofficial Instagram endpoints
-- Token exposure to client
-- Complex microservices
-- Kubernetes
-- Event-driven architecture
-- Multi-tenant team permissions
-- Billing infrastructure
-
-## MVP principle
-Prefer a small reliable monolith over a sophisticated architecture.
+- Private account scraping (requires Instagram credentials / session cookies).
+- Historical post pagination beyond the first 12 posts.
+- Publishing, scheduling, or story posting.
+- Direct messages or comment moderation.
+- Meta Graph API or Facebook Login integration.
