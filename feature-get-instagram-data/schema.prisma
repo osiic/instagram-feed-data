@@ -1,0 +1,59 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// -----------------------------------------------------------------------------
+// 3 Fixed Watched Instagram Account Slots
+// Slot 1: @baron_nduts
+// Slot 2: @baron_nduts_bbq
+// Slot 3: @baron_nduts.cottage
+// -----------------------------------------------------------------------------
+
+model WatchedAccount {
+  // Fixed slot ID: 1, 2, or 3 (cannot add more than 3)
+  slot              Int            @id
+  username          String         @unique
+  name              String?
+  biography         String?
+  profilePictureUrl String?
+  followersCount    Int?
+  followsCount      Int?
+  mediaCount        Int?
+  isVerified        Boolean        @default(false)
+  lastSyncedAt      DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  // 1-to-many relation with scraped media
+  media             WatchedMedia[]
+
+  @@map("watched_instagram_accounts")
+}
+
+model WatchedMedia {
+  id                 String         @id @default(cuid())
+  slot               Int
+  instagramMediaId   String
+  mediaType          String         // IMAGE, VIDEO, or CAROUSEL_ALBUM
+  mediaUrl           String?
+  thumbnailUrl       String?
+  caption            String?
+  permalink          String
+  likeCount          Int?
+  commentsCount      Int?
+  timestamp          DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  account            WatchedAccount @relation(fields: [slot], references: [slot], onDelete: Cascade)
+
+  // Ensure unique post per slot
+  @@unique([slot, instagramMediaId])
+  @@index([slot, timestamp])
+  @@map("watched_instagram_media")
+}

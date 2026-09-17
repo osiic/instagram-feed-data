@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------------------------------------
+// Better Auth Core Models
+// --------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions      Session[]
+  accounts      Account[]
+  instagramAccounts InstagramAccount[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verifications")
+}
+
+// --------------------------------------------------------
+// Instagram Multi-Account Domain Models
+// --------------------------------------------------------
+
+model InstagramAccount {
+  id                String            @id @default(cuid())
+  userId            String
+  instagramUserId   String            @unique
+  username          String
+  name              String?
+  profilePictureUrl String?
+  biography         String?
+  followersCount    Int?
+  followsCount      Int?
+  mediaCount        Int?
+  accountType       String?
+  connectedAt       DateTime          @default(now())
+  lastSyncedAt      DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token             InstagramToken?
+  media             InstagramMedia[]
+  insights          InstagramInsight[]
+
+  @@index([userId])
+  @@map("instagram_accounts")
+}
+
+model InstagramToken {
+  id                   String           @id @default(cuid())
+  instagramAccountId   String           @unique
+  encryptedAccessToken String
+  expiresAt            DateTime?
+  scopes               String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  account              InstagramAccount @relation(fields: [instagramAccountId], references: [id], onDelete: Cascade)
+
+  @@map("instagram_tokens")
+}
+
+model InstagramMedia {
+  id                 String           @id @default(cuid())
+  instagramAccountId String
+  instagramMediaId   String
+  mediaType          String?
+  mediaUrl           String?
+  thumbnailUrl       String?
+  caption            String?
+  permalink          String?
+  timestamp          DateTime?
+  likeCount          Int?
+  commentsCount      Int?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  account            InstagramAccount @relation(fields: [instagramAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([instagramAccountId, instagramMediaId])
+  @@index([instagramAccountId])
+  @@map("instagram_media")
+}
+
+model InstagramInsight {
+  id                 String           @id @default(cuid())
+  instagramAccountId String
+  metric             String
+  value              Float
+  period             String?
+  startAt            DateTime?
+  endAt              DateTime?
+  fetchedAt          DateTime         @default(now())
+
+  account            InstagramAccount @relation(fields: [instagramAccountId], references: [id], onDelete: Cascade)
+
+  @@index([instagramAccountId, metric, fetchedAt])
+  @@map("instagram_insights")
+}
